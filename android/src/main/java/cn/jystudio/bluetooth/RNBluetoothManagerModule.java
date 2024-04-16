@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Build;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.util.Log;
@@ -85,7 +86,12 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
         // Register for broadcasts when a device is discovered
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        this.reactContext.registerReceiver(discoverReceiver, filter);
+        //update for android 14
+        if (Build.VERSION.SDK_INT >= 34 && this.reactContext.getApplicationInfo().targetSdkVersion >= 34) {
+            this.reactContext.registerReceiver(discoverReceiver, filter, this.reactContext.RECEIVER_EXPORTED);
+        }else{
+            this.reactContext.registerReceiver(discoverReceiver, filter);
+        }
     }
 
     @Override
