@@ -26,9 +26,14 @@ import org.json.JSONObject;
 
 import javax.annotation.Nullable;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 /**
@@ -69,6 +74,8 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
     private static final String PROMISE_ENABLE_BT = "ENABLE_BT";
     private static final String PROMISE_SCAN = "SCAN";
     private static final String PROMISE_CONNECT = "CONNECT";
+    
+    private static List<Vendor> vendorList = new ArrayList<>();
 
     private JSONArray pairedDeivce = new JSONArray();
     private JSONArray foundDevice = new JSONArray();
@@ -79,12 +86,26 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
     // Member object for the services
     private BluetoothService mService = null;
 
+    // Class to hold the vendor information from the JSON
+    private static class Vendor {
+        String macPrefix;
+        String vendorName;
+
+        Vendor(String macPrefix, String vendorName) {
+            this.macPrefix = macPrefix;
+            this.vendorName = vendorName;
+        }
+    }
+
     public RNBluetoothManagerModule(ReactApplicationContext reactContext, BluetoothService bluetoothService) {
         super(reactContext);
         this.reactContext = reactContext;
         this.reactContext.addActivityEventListener(this);
         this.mService = bluetoothService;
         this.mService.addStateObserver(this);
+        if (vendorList.isEmpty()) {
+            loadVendorData(reactContext);  // Load vendor data on first use
+        }
         // Register for broadcasts when a device is discovered
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
@@ -143,6 +164,7 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
                     obj.put("name", d.getName());
                     obj.put("address", d.getAddress());
                     obj.put("type", identifyDeviceType(d));
+                    obj.put("manufacturer", getManufacturerFromMacAddress(d));
                     pairedDeivce.pushString(obj.toString());
                 } catch (Exception e) {
                     //ignore.
@@ -209,7 +231,6 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
                 }
             }
 
-
             pairedDeivce = new JSONArray();
             foundDevice = new JSONArray();
             Set<BluetoothDevice> boundDevices = adapter.getBondedDevices();
@@ -219,6 +240,7 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
                     obj.put("name", d.getName());
                     obj.put("address", d.getAddress());
                     obj.put("type", identifyDeviceType(d));
+                    obj.put("manufacturer", getManufacturerFromMacAddress(d));
                     pairedDeivce.put(obj);
                 } catch (Exception e) {
                     //ignore.
@@ -235,6 +257,47 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
                 promiseMap.put(PROMISE_SCAN, promise);
             }
         }
+    }
+
+    public static void loadVendorData(Context context) {
+        try {
+            InputStream inputStream = context.getAssets().open("vendor_data.json"); // Put your JSON file in the assets folder
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            StringBuilder stringBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                stringBuilder.append(line);
+            }
+
+            // Parse the JSON array and populate the vendor list
+            JSONArray jsonArray = new JSONArray(stringBuilder.toString());
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                String macPrefix = jsonObject.getString("macPrefix");
+                String vendorName = jsonObject.getString("vendorName");
+
+                vendorList.add(new Vendor(macPrefix, vendorName));
+            }
+
+            reader.close();
+        } catch (Exception e) {
+            Log.e("BluetoothUtil", "Error loading vendor data: ", e);
+        }
+    }
+    private static String getManufacturerFromMacAddress(BluetoothDevice device) {
+        String macAddress = device.getAddress();
+        if (macAddress != null && macAddress.length() >= 17) {
+            // Extract the MAC prefix (first 3 bytes)
+            String macPrefix = macAddress.substring(0, 8).toUpperCase().replace(":", "");
+            // Search for the vendor in the list of vendor data
+            for (Vendor vendor : vendorList) {
+                String macVendor=vendor.macPrefix.toUpperCase().replace(":", "");
+                if (macPrefix.equals(macPrefix)) {
+                    return vendor.vendorName; // Return the matching vendor name
+                }
+            }
+        }
+        return "Unknown Manufacturer";
     }
 
     private String identifyDeviceType(BluetoothDevice device) {
@@ -491,6 +554,7 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
                                 obj.put("name", d.getName());
                                 obj.put("address", d.getAddress());
                                 obj.put("type", identifyDeviceType(d));
+                                obj.put("manufacturer", getManufacturerFromMacAddress(d));
                                 pairedDeivce.pushString(obj.toString());
                             } catch (Exception e) {
                                 //ignore.
@@ -559,6 +623,7 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
                         deviceFound.put("name", device.getName());
                         deviceFound.put("address", device.getAddress());
                         deviceFound.put("type", identifyDeviceType(device));
+                        deviceFound.put("manufacturer", getManufacturerFromMacAddress(device));
                     } catch (Exception e) {
                         //ignore
                     }
