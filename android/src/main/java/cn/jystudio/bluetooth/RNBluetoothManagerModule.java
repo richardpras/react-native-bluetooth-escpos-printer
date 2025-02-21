@@ -27,13 +27,10 @@ import org.json.JSONObject;
 import javax.annotation.Nullable;
 
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 /**
@@ -75,7 +72,7 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
     private static final String PROMISE_SCAN = "SCAN";
     private static final String PROMISE_CONNECT = "CONNECT";
     
-    private static List<Vendor> vendorList = new ArrayList<>();
+    private static final Map<String, String> manufacturerData = new HashMap<>();
 
     private JSONArray pairedDeivce = new JSONArray();
     private JSONArray foundDevice = new JSONArray();
@@ -103,7 +100,7 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
         this.reactContext.addActivityEventListener(this);
         this.mService = bluetoothService;
         this.mService.addStateObserver(this);
-        if (vendorList.isEmpty()) {
+        if (manufacturerData.isEmpty()) {
             loadVendorData(reactContext);  // Load vendor data on first use
         }
         // Register for broadcasts when a device is discovered
@@ -262,24 +259,27 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
     public static void loadVendorData(Context context) {
         try {
             InputStream inputStream = context.getAssets().open("vendor_data.json"); // Put your JSON file in the assets folder
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-            StringBuilder stringBuilder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                stringBuilder.append(line);
+            // Read the input stream into a string
+            int size = inputStream.available();
+            byte[] buffer = new byte[size];
+            inputStream.read(buffer);
+            inputStream.close();
+
+            // Convert the byte array into a string
+            String jsonData = new String(buffer);
+
+            // Parse the JSON string into a JSONObject
+            JSONObject jsonObject = new JSONObject(jsonData);
+
+            // Iterate through the JSON object and populate the map
+            for (Iterator<String> it = jsonObject.keys(); it.hasNext();) {
+                String key = it.next();
+                String value = jsonObject.getString(key);
+                // Remove hyphens from the MAC address prefix (key)
+                String formattedKey = key.replace("-", "").toUpperCase();
+                manufacturerData.put(formattedKey, value); // Store with uppercase key
             }
 
-            // Parse the JSON array and populate the vendor list
-            JSONArray jsonArray = new JSONArray(stringBuilder.toString());
-            for (int i = 0; i < jsonArray.length(); i++) {
-                JSONObject jsonObject = jsonArray.getJSONObject(i);
-                String macPrefix = jsonObject.getString("macPrefix");
-                String vendorName = jsonObject.getString("vendorName");
-
-                vendorList.add(new Vendor(macPrefix, vendorName));
-            }
-
-            reader.close();
         } catch (Exception e) {
             Log.e("BluetoothUtil", "Error loading vendor data: ", e);
         }
@@ -290,11 +290,8 @@ public class RNBluetoothManagerModule extends ReactContextBaseJavaModule
             // Extract the MAC prefix (first 3 bytes)
             String macPrefix = macAddress.substring(0, 8).toUpperCase().replace(":", "");
             // Search for the vendor in the list of vendor data
-            for (Vendor vendor : vendorList) {
-                String macVendor=vendor.macPrefix.toUpperCase().replace(":", "");
-                if (macPrefix.equals(macPrefix)) {
-                    return vendor.vendorName; // Return the matching vendor name
-                }
+            if (manufacturerData.containsKey(macPrefix)) {
+                return manufacturerData.get(macPrefix);  // Return manufacturer name
             }
         }
         return "Unknown Manufacturer";
