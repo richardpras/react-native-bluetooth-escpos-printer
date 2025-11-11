@@ -1,28 +1,18 @@
 buildscript {
     repositories {
         google()
-        jcenter { url "https://jcenter.bintray.com/" }
-        maven {url "https://repo.spring.io/plugins-release/"}
         mavenCentral()
-        maven {
-            // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-            url "$rootDir/../node_modules/react-native/android"
-        }
-        maven {
-            url 'https://maven.google.com'
-        }
     }
-
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.1.4'
+        classpath 'com.android.tools.build:gradle:8.2.1' // aman untuk Expo SDK 51–54
     }
 }
 
 apply plugin: 'com.android.library'
 
 android {
+    namespace "cn.jystudio.bluetooth" // sesuaikan kalau beda package
     compileSdkVersion 33
-    buildToolsVersion "33.0.0"
 
     defaultConfig {
         minSdkVersion 21
@@ -30,9 +20,11 @@ android {
         versionCode 1
         versionName "1.0"
     }
-    lintOptions {
+
+    lint {
         abortOnError false
     }
+
     sourceSets {
         main {
             aidl.srcDirs = ['src/main/java']
@@ -41,21 +33,12 @@ android {
 }
 
 repositories {
-    jcenter { url "https://jcenter.bintray.com/" }
-    maven {url "https://repo.spring.io/plugins-release/"}
+    google()
     mavenCentral()
-    maven {
-        // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-        url "$rootDir/../node_modules/react-native/android"
-    }
-    maven {
-        url 'https://maven.google.com'
-    }
 }
 
 dependencies {
-    // implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'com.facebook.react:react-native:+'  // From node_modules
-    implementation group: 'com.android.support', name: 'support-v4', version: '27.0.0'
-    implementation "com.google.zxing:core:3.3.0"
+    implementation "androidx.core:core:1.12.0"          // ✅ ganti support-v4
+    implementation "com.google.zxing:core:3.5.3"        // versi AndroidX kompatibel
 }
